@@ -115,6 +115,16 @@ void formatString(char* skeleton, void *value) {
     snprintf(temp, MAX_TEXTBOX, skeleton, str);
 }
 
+#define format(typeV)                                       \
+    ({                                                    \
+        void formatP(char* skeleton, void* value) {        \
+            typeV v = *(typeV*) value;                      \
+            snprintf(temp, MAX_TEXTBOX, skeleton, v);  \
+        }                                                   \
+        formatP;                                            \
+    })
+
+
 typedef struct{
     char text[MAX_TEXTBOX];
     char* skeleton;
@@ -169,7 +179,7 @@ int main(void) {
     int number1 = 0;
   
     Button* someButton = addButton((Vector2){240, 60}, "hello", 0);
-    addtextBox(1, "number1: %d", &number1, BLACK, formatInt);
+    addtextBox(1, "number1: %d", &number1, BLACK, format(int));
 
     bool shouldgreet = false;
 
