@@ -115,13 +115,13 @@ void formatString(char* skeleton, void *value) {
     snprintf(temp, MAX_TEXTBOX, skeleton, str);
 }
 
-#define format(typeV)                                       \
-    ({                                                    \
-        void formatP(char* skeleton, void* value) {        \
-            typeV v = *(typeV*) value;                      \
-            snprintf(temp, MAX_TEXTBOX, skeleton, v);  \
-        }                                                   \
-        formatP;                                            \
+#define format(typeV)                                   \
+    ({                                                  \
+        void formatP(char* skeleton, void* value) {     \
+            typeV v = *(typeV*) value;                  \
+            snprintf(temp, MAX_TEXTBOX, skeleton, v);   \
+        }                                               \
+        formatP;                                        \
     })
 
 
@@ -170,6 +170,89 @@ void drawTextBoxs() {
     }
 }
 
+//----- struct slider -----
+char tempS[MAX_TEXTBOX];
+
+typedef struct{
+    Vector2 position;
+    int length;
+    int width;
+    int rangeMin;
+    int rangeMax;
+
+    int size;
+    Color textCol;
+    char* text;
+    bool hovered;
+    bool adjusting;
+
+    Rectangle buttonRc;
+    Vector2 valuePos;
+    int value;
+
+    int leftEnd;
+    int offset;
+} Slider;
+Slider sliders[linesCount];
+int sliderCount = 0;
+int defaultWidth = 10;
+int defaultButtonLength = 20;
+int padding = 20;
+
+Slider* addSlider(int line, int length, int rangeMax, int rangeMin, int defaultValue, char* text) {
+    if(lineIsUsed[line]) {
+        return NULL;
+    }
+  
+    lineIsUsed[line] = true;
+    sliders[sliderCount++] = (Slider) {
+        .position = (Vector2) { displayW, line * lineH},
+        .size = defaultSize,
+        .textCol = BLACK,
+        .text = text,
+        .rangeMin = rangeMin,
+        .rangeMax = rangeMax,
+        .length = length,
+        .leftEnd = displayW + defaultSize * 0.5 * strlen(text) + padding,
+        .buttonRc = (Rectangle) { displayW + defaultSize * 0.5 * strlen(text) + padding + length / (rangeMax - rangeMin) * (defaultValue - rangeMin),
+                                  line * lineH + lineH/2 - defaultWidth/2, defaultButtonLength, defaultWidth},
+        .value = defaultValue,
+        .width = defaultWidth,
+        
+    };
+    
+    return sliders + sliderCount - 1;
+}
+
+void updateSilders() {
+    Vector2 mouse = GetMousePosition();
+    for(int i = 0; i < sliderCount; i++) {
+        Slider* s = &sliders[i];
+        s->hovered = CheckCollisionPointRec(mouse, s->buttonRc);
+        if(s->hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            s->adjusting = true;
+            s->offset = mouse.x - s->buttonRc.x;
+        }
+        if(s->adjusting && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) s->adjusting = false;
+        if(s->adjusting) {
+            int crr_x = mouse.x - s->offset;
+            if(crr_x > s->leftEnd && crr_x < s->leftEnd + s->length) s->buttonRc.x = crr_x;
+            s->value = (s->buttonRc.x - s->leftEnd) / s->length * (s->rangeMax - s->rangeMin) + s->rangeMin;
+        }
+    }
+}
+
+void drawSliders() {
+    for(int i = 0; i < sliderCount; i++) {
+        Slider* s = &sliders[i];
+        DrawText(s->text, s->position.x, s->position.y, s->size, s->textCol);
+        DrawRectangleRec((Rectangle) {s->leftEnd, s->buttonRc.y, s->length + s->buttonRc.width, s->width}, GRAY);
+        DrawRectangleRec(s->buttonRc, BLACK);
+        snprintf(tempS, MAX_TEXTBOX, "%d", s->value);
+        DrawText(tempS, s->leftEnd + s->length + padding, s->buttonRc.y, s->size, s->textCol);
+    }
+}
+
 //----- main -----
 
 int main(void) {
@@ -180,12 +263,14 @@ int main(void) {
   
     Button* someButton = addButton((Vector2){240, 60}, "hello", 0);
     addtextBox(1, "number1: %d", &number1, BLACK, format(int));
+    Slider* someSlider = addSlider(2, 120, 120, 1, 60, "FPS:");
 
     bool shouldgreet = false;
 
     while(!WindowShouldClose()) {
         updateButtons();
         updateTextBoxs();
+        updateSilders();
 
         
         number1++;
@@ -197,9 +282,12 @@ int main(void) {
         DrawLine(displayW, 0, displayW, screenH, BLACK);
 
         if(shouldgreet) DrawText("world", 20, 20, 30, BLACK);
+
+        SetTargetFPS(someSlider->value);
     
         drawButtons();
         drawTextBoxs();
+        drawSliders();
     
         EndDrawing();
     }
